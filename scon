@@ -1,0 +1,247 @@
+#!/bin/bash
+
+# __Author__ : revi1337
+# __Date__ : 2022-10-17
+
+filename=$(basename "$0")
+
+########################## DEFINE USAGE, MAN PAGE ###########################
+
+usage() {
+  echo -e "Usage: $filename\n
+  [ SYNTAX ]\n
+  $filename \e[4m-i IFORMAT\e[0m \e[4m-o OFORMAT\e[0m \e[4mVALUES\e[0m\n\n
+  [ REQUIRE ]\n
+  -i, --input : 2, 8, 10, 16
+  -o, --output : 2, 8, 10, 16\n\n
+  [ OPTIONAL ]\n
+  --base32 : Base32 encode the result
+  --base64 : Base64 encode the result
+  -h, --help : print man page (Can See Examples)\n"
+
+  exit 1
+}
+
+help() {
+  echo -e "NAME"
+  echo -e "\t$filename — utility to convert binary, octal, decimal, hexadecimal and characters\n"
+  echo -e "SYNOPSIS"
+  echo -e "\t$filename \e[4m-i IFORMAT\e[0m \e[4m-o OFORMAT\e[0m \e[4mVALUES\e[0m"
+  echo -e "\t$filename \e[4m-i IFORMAT\e[0m \e[4m-o OFORMAT\e[0m \e[4mVALUES\e[0m [[--base32] | [--base64]] [-h | --help]\n"
+  echo -e "DESCRIPTION"
+  echo -e "\tIt doesn't matter what the VALUES comes from. \e[0m \e[4mHowever, VALUES is required.\e[0m"
+  echo -e "\tWritten By Revi1337 (2022-10-17)\n"
+  echo -e "\t-i, --input \e[4mIFORMAT\e[0m"
+  echo -e "\t\tspecify input format. IFORMAT exists 2(Binary), 8(Octal), 10(Decimal)"
+  echo -e "\t\t16(Hexadecimal), c(Character) IFORMAT & OFORMAT cannot be same\n"
+  echo -e "\t-o, --output \e[4mOFORMAT\e[0m"
+  echo -e "\t\tspecify output format. OFORMAT exists 2(Binary), 8(Octal), 10(Decimal)"
+  echo -e "\t\t16(Hexadecimal), c(Character) IFORMAT & OFORMAT cannot be same\n"
+  echo -e "\t--base32"
+  echo -e "\t\tencode the result as base32\n"
+  echo -e "\t--base64"
+  echo -e "\t\tencode the result as base64\n"
+  echo -e "\t-h, --help"
+  echo -e "\t\tprint man page\n"
+  echo -e "EXAMPLES"
+  echo -e "\t$filename -h  ,  $filename --help \t\t\t(help)"
+  echo -e "\t$filename '116 101 115 116' -i 10 -o 2 \t\t(Decimal2Binary)"
+  echo -e "\t$filename -i 16 -o 10 '\\\x74\\\x65\\\x73\\\x74' \t\t(Hexadecimal2Decimal)"
+  echo -e "\t$filename --i 8 '164 145 163 164' -o c \t\t(Octal2Character)"
+  echo -e "\t$filename -i c -o 8 'test' \t\t\t\t(Character2Octal)"
+  echo -e "\t$filename '01110100 01100101 01110011 01110100' -i 2 -o c (Binary2Character)"
+  echo -e "\t$filename -i c -o 8 revi1337 --base64 \t\t(encode result as base64)\n"
+  echo -e "SEE ALSO"
+  echo -e "\techo, printf, cut, tr, xxd, awk, sed, xargs, fold\n"
+  exit 1
+}
+
+############################# PARSING ARGUMENTS ###############################
+
+INPUT=unset
+OUTPUT=unset
+BASE32=unset
+BASE64=unset
+HELP=unset
+
+PARSED_ARGUMENTS=$(getopt -n $0 -o i:o:h --long base64,base32,help,input:,output: -- "$@")
+VALID_ARGUMENTS=$?
+
+eval set -- "$PARSED_ARGUMENTS"
+
+while :
+do
+  case "$1" in
+    -i | --input)   INPUT="$2"   ; shift 2 ;;
+
+    -o | --output)  OUTPUT="$2"  ; shift 2 ;;
+
+    -h | --help)  HELP=1         ; shift ;;
+
+    --base32)  BASE32=1          ; shift ;;
+
+    --base64)  BASE64=1          ; shift ;;
+
+    --) shift; break ;;
+
+    *) usage ;;
+  esac
+done
+
+# name=$0
+
+########################## PARSING ARGUMENTS VALUES #########################
+
+if [[ $HELP -eq 1 ]]; then
+  help
+fi
+
+if [[ ! "$#" -eq 0 ]] && [[ $HELP -eq 1 ]]; then
+  usage
+fi
+
+if [ "$#" -eq 0 ]; then
+  # echo -e "INFO: $filename: VALUES must contain a value."
+  usage
+fi
+
+if [[ ! $INPUT =~ ^(2|8|10|16|c)$ ]] || [[ ! $OUTPUT =~ ^(2|8|10|16|c)$ ]]; then
+  echo -e "INFO: $filename: value of the option -i, -o must be correct"
+  usage
+fi
+
+if [[ $INPUT -eq $OUTPUT ]]; then
+  echo -e "INFO: $filename: value of option -i and -o cannot be the same"
+  usage
+fi
+
+if [[ $BASE32 -eq 1 && $BASE64 -eq 1 ]]; then
+  echo -e "INFO: $filename: only have to choose out of base64 and base32"
+  usage
+fi
+
+if [[ $HELP -eq 1 ]]; then
+  usage
+fi
+
+############################## DEBUG VARIABLES #############################
+
+# echo "INPUT   : $INPUT"
+# echo "OUTPUT  : $OUTPUT"
+# echo "BASE32  : $BASE32"
+# echo "BASE64  : $BASE64"
+# echo "HELP    : $HELP"
+
+VALUES=("$@")
+
+TARGET=${VALUES[${#VALUES[@]}-1]}
+
+############################# CONVERTING LOGIC #############################
+
+if [[ $INPUT -eq c ]]; then
+  if [[ $OUTPUT -eq 2 ]]; then
+    res=$(echo -n "$TARGET" | xxd -b -c 1 | cut -d ' ' -f 2 | tr '\n' ' ' | sed -e 's/.$//g')
+    echo "$res"
+
+  elif [[ $OUTPUT -eq 8 ]]; then
+    echo -n $TARGET | od -A n -t o1 | sed -e 's/^.//g'
+
+  elif [[ $OUTPUT -eq 10 ]]; then
+
+    for i in $(echo -n $TARGET | fold -w 1 | tr '\n' ' '); do 
+      printf "%d\n" \'$i
+    done | tr '\n' ' ' | sed -e 's/.$//g'
+    echo 
+
+  elif [[ $OUTPUT -eq 16 ]]; then
+    res=$(echo -n "$TARGET" | xxd -c 1 | cut -d ' ' -f 2 | awk '{printf "\\x"$i}')
+    echo "$res"
+  fi
+
+elif [[ $INPUT -eq 2 ]]; then
+  if [[ $OUTPUT -eq 8 ]]; then
+    for i in $TARGET; do
+      echo $((2#$i))
+    done | awk '{printf("%c", $1)}' | od -A n -t o1 | sed -e 's/^.//g'
+
+
+  elif [[ $OUTPUT -eq 10 ]]; then
+    for i in $TARGET; do 
+      printf "$((2#$i)) " 
+    done | sed -e 's/.$//g'
+    echo 
+
+  elif [[ $OUTPUT -eq 16 ]]; then
+    for i in $TARGET; do
+      echo $((2#$i))
+    done | awk '{printf("%c", $1)}' | xxd -c 1 | cut -d ' ' -f 2 | awk '{print "\\x"$1}' | tr -d '\n'
+    echo
+
+  elif [[ $OUTPUT -eq c ]]; then
+    for i in $(echo -n "$TARGET" | sed -e 's/ /\n/g' | xargs -I argv bash -c '{ echo "$((2#argv))"; }' | tr '\n' ' ' | sed -e 's/.$//g'); do
+      echo "$i" | awk '{printf("%c", $0)}' 
+    done
+    echo
+  fi
+
+elif [[ $INPUT -eq 8 ]]; then
+  if [[ $OUTPUT -eq 2 ]]; then
+    for i in $TARGET; do 
+      echo $((8#$i)) 
+    done | awk '{printf("%c",$1)}' | xxd -b -c 1 | cut -d ' ' -f 2 | tr '\n' ' ' | sed -e 's/.$//g'
+    echo 
+    
+  elif [[ $OUTPUT -eq 10 ]]; then
+    for i in $TARGET; do
+      echo $((8#$i))
+    done | tr '\n' ' ' | sed -e 's/.$/\n/g'
+
+  elif [[ $OUTPUT -eq 16 ]]; then
+    for i in $TARGET; do 
+      echo $((8#$i)); 
+    done | awk '{printf("%c",$1)}' | xxd -c 1 | cut -d ' ' -f 2 | awk '{print "\\x"$1}' | tr -d '\n'
+    echo
+
+  elif [[ $OUTPUT -eq c ]]; then
+    for i in $TARGET; do 
+      echo $((8#$i)); 
+    done | awk '{printf("%c",$1)}'
+    echo
+  fi
+
+elif [[ $INPUT -eq 10 ]]; then
+  if [[ $OUTPUT -eq 2 ]]; then
+    res=$(echo -n "$TARGET" | tr ' ' '\n' | awk '{printf("%c", $1)}' | xxd -b -c 1 | cut -d ' ' -f 2 | tr '\n' ' ')
+    echo "$res"
+
+  elif [[ $OUTPUT -eq 8 ]]; then
+    echo -n $TARGET | tr ' ' '\n' | awk '{printf("%c",$1)}' | od -A n -t o1 | sed -e 's/^.//g'
+
+  elif [[ $OUTPUT -eq 16 ]]; then
+    res=$(echo -n "$TARGET" | tr ' ' '\n' | awk '{printf("\\x%x", $1)}')
+    echo "$res"
+
+  elif [[ $OUTPUT -eq c ]]; then
+    res=$(echo -n "$TARGET" | tr ' ' '\n' | awk '{printf("\\x%x", $1)}')
+    echo -e "$res"
+  fi
+
+elif [[ $INPUT -eq 16 ]]; then
+  if [[ $OUTPUT -eq 2 ]]; then
+    res=$(echo -n "$TARGET" | sed -e 's/\\x//g' | xxd -r -p | xxd -b -c 1 | cut -d ' ' -f 2 | tr -d '\n' | fold -w 8 | tr '\n' ' ')
+    echo "$res"
+
+  elif [[ $OUTPUT -eq 8 ]]; then
+    echo -e $TARGET | tr -d '\n' | od -A n -t o1 | sed -e 's/^.//g'
+
+  elif [[ $OUTPUT -eq 10 ]]; then
+    for i in $(echo -n "$TARGET" | sed -e 's/\\x//g' | xxd -r -p | fold -w 1 | tr '\n' ' '); do
+      printf "%d " \'$i
+    done | sed -e 's/.$//g'
+    echo -e
+
+  elif [[ $OUTPUT -eq c ]]; then
+    echo -e "$TARGET"
+  fi
+fi
+
